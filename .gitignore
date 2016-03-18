@@ -1,0 +1,9 @@
+NightCrawlerApi
+phantomjs
+*.log
+*.zip
+*.png
+*.pdf
+*.jpeg
+awsenv.sh
+awsenv.bat
