@@ -23,9 +23,6 @@ func main() {
 
 	settings.PhantomPath = "./"
 
-	os.Setenv("AWS_ACCESS_KEY_ID", "AKIAIVXKJYWULVIWZNGQ")
-	os.Setenv("AWS_SECRET_ACCESS_KEY", "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")
-
 	r := gin.Default()
 
 	r.GET("crawl/siteinfo", siteinfo)
