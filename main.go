@@ -16,20 +16,26 @@ import (
 )
 
 type Settings struct {
-	PhantomPath string
+	PhantomPath  string
+	MailSettings map[string]string
+	S3Buckets    map[string]string
 }
 
-var settings Settings = Settings{}
+var appSettings Settings = Settings{}
 
 func main() {
 
-	settings.PhantomPath = "./"
+	appSettings.PhantomPath = "./"
+	appSettings.S3Buckets = map[string]string{
+		"Screenshots": "nightcrawlerlinks",
+	}
 
 	r := gin.Default()
 
 	r.GET("crawl/siteinfo", siteinfo)
 	r.GET("crawld/screenshot", screenshot)
 	r.GET("crawld/siteinfo", siteinfodyn)
+	r.GET("crawld/bucketinfo", bucketinfo)
 	r.GET("crawld/pageload", siteinfodyn)
 	r.GET("crawl/task/add", crawltask)
 	r.GET("crawl/task/info", crawltask)
@@ -37,6 +43,27 @@ func main() {
 	r.GET("crawl/task/delete", crawltask)
 	r.GET("/tasks", tasks)
 	r.Run(":8076")
+}
+
+func bucketinfo(g *gin.Context) {
+	b := GetBucketUrl("nightcrawlerlinks")
+	g.String(200, b)
+}
+
+func getMimeType(fileName string) string {
+	ext := path.Ext(fileName)
+	if ext == ".jpeg" {
+		ext = ".jpg"
+	}
+	cType := mime.TypeByExtension(ext)
+	if cType == "" {
+		cType = "binary/octet-stream"
+	}
+	return cType
+}
+
+func GetBucketUrl(bucketName string) string {
+	return "https://s3.amazonaws.com/" + bucketName + "/"
 }
 
 func uploadToS3(fileName string, key string, meta map[string]*string) (string, error) {
@@ -48,24 +75,27 @@ func uploadToS3(fileName string, key string, meta map[string]*string) (string, e
 
 	svc := s3.New(session.New(), &aws.Config{Region: aws.String("us-east-1")})
 
-	bucket := "nightcrawlerlinks"
-	ext := path.Ext(fileName)
-	if ext == ".jpeg" {
-		ext = ".jpg"
+	if err != nil {
+		log.Println("GetBucketLocation", err)
 	}
-	cType := mime.TypeByExtension(ext)
+
+	bucketName := appSettings.S3Buckets["Screenshots"]
+	bucketUrl := GetBucketUrl(bucketName)
+
+	cType := getMimeType(fileName)
 
 	_, err = svc.PutObject(&s3.PutObjectInput{
 		Body:        f,
-		Bucket:      &bucket,
+		Bucket:      &bucketName,
 		Key:         &key,
 		ContentType: &cType,
 		Metadata:    meta,
 	})
+
 	if err != nil {
 		log.Println(err)
 	}
-	return "https://s3.amazonaws.com/nightcrawlerlinks/" + key, nil
+	return bucketUrl + key, nil
 }
 
 func siteinfo(g *gin.Context) {
@@ -119,7 +149,7 @@ func screenshot(g *gin.Context) {
 }
 
 func runPhantom(args ...string) ([]byte, error) {
-	out, err := exec.Command(settings.PhantomPath+"phantomjs", args...).Output()
+	out, err := exec.Command(appSettings.PhantomPath+"phantomjs", args...).Output()
 	return out, err
 }
 
