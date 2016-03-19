@@ -7,6 +7,9 @@ var page = require('webpage').create();
 page.viewportSize = { width: 1920, height: 1080 };
 page.resourceTimeout = 20000;
 page.open(url, function() {
-  page.render(fileName,{'format':format,quality:'75'});
-  phantom.exit();
+	window.setTimeout(function () {
+            page.render(fileName,{'format':format,quality:'75'});
+  			phantom.exit();
+    }, 1000)
+
 });
