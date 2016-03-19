@@ -75,13 +75,7 @@ func uploadToS3(fileName string, key string, meta map[string]*string) (string, e
 
 	svc := s3.New(session.New(), &aws.Config{Region: aws.String("us-east-1")})
 
-	if err != nil {
-		log.Println("GetBucketLocation", err)
-	}
-
 	bucketName := appSettings.S3Buckets["Screenshots"]
-	bucketUrl := GetBucketUrl(bucketName)
-
 	cType := getMimeType(fileName)
 
 	_, err = svc.PutObject(&s3.PutObjectInput{
@@ -95,6 +89,8 @@ func uploadToS3(fileName string, key string, meta map[string]*string) (string, e
 	if err != nil {
 		log.Println(err)
 	}
+
+	bucketUrl := GetBucketUrl(bucketName)
 	return bucketUrl + key, nil
 }
 
@@ -110,7 +106,7 @@ func screenshot(g *gin.Context) {
 	queryUrl := g.Query("url")
 	format := g.Query("format")
 	if format == "" {
-		format = "jpeg"
+		format = "jpg"
 	}
 	if queryUrl == "" {
 		g.String(403, "needs url parameter")
