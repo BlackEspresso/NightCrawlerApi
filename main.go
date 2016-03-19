@@ -76,7 +76,7 @@ func uploadToS3(fileName string, key string, meta map[string]*string) (string, e
 	svc := s3.New(session.New(), &aws.Config{Region: aws.String("us-east-1")})
 
 	bucketName := appSettings.S3Buckets["Screenshots"]
-	cType := getMimeType(fileName)
+	cType := getMimeType(key)
 
 	_, err = svc.PutObject(&s3.PutObjectInput{
 		Body:        f,
