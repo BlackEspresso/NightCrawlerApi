@@ -2,9 +2,11 @@ package main
 
 import (
 	"log"
+	"mime"
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -47,11 +49,17 @@ func uploadToS3(fileName string, key string) (string, error) {
 	svc := s3.New(session.New(), &aws.Config{Region: aws.String("us-east-1")})
 
 	bucket := "nightcrawlerlinks"
+	ext := path.Ext(fileName)
+	if ext == ".jpeg" {
+		ext = ".jpg"
+	}
+	cType := mime.TypeByExtension(ext)
 
 	_, err = svc.PutObject(&s3.PutObjectInput{
-		Body:   f,
-		Bucket: &bucket,
-		Key:    &key,
+		Body:        f,
+		Bucket:      &bucket,
+		Key:         &key,
+		ContentType: &cType,
 	})
 	if err != nil {
 		log.Println(err)
