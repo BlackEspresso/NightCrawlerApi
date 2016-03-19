@@ -39,7 +39,7 @@ func main() {
 	r.Run(":8076")
 }
 
-func uploadToS3(fileName string, key string) (string, error) {
+func uploadToS3(fileName string, key string, meta map[string]*string) (string, error) {
 	f, err := os.Open(fileName)
 	if err != nil {
 		return "", err
@@ -60,6 +60,7 @@ func uploadToS3(fileName string, key string) (string, error) {
 		Bucket:      &bucket,
 		Key:         &key,
 		ContentType: &cType,
+		Metadata:    meta,
 	})
 	if err != nil {
 		log.Println(err)
@@ -109,7 +110,10 @@ func screenshot(g *gin.Context) {
 	}
 
 	fname := fileUUID.String() + "." + format
-	downloadUrl, _ := uploadToS3("./"+fileUUID.String(), fname)
+	meta := map[string]*string{
+		"URL": &queryUrl,
+	}
+	downloadUrl, _ := uploadToS3("./"+fileUUID.String(), fname, meta)
 	os.Remove(fileUUID.String())
 	g.String(200, downloadUrl)
 }
