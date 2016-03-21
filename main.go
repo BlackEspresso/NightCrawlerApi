@@ -133,6 +133,9 @@ func screenshot(g *gin.Context) {
 		g.String(403, "needs url parameter")
 		return
 	}
+	if screensize == "" || !IsValidScreenSize(screensize, 4000) {
+		screensize = "1920x1080"
+	}
 
 	url, err := url.Parse(queryUrl)
 	if err != nil {
@@ -148,12 +151,9 @@ func screenshot(g *gin.Context) {
 		return
 	}
 
-	if !IsValidScreenSize(screensize, 4000) {
-		screensize = "1920x1080"
-	}
-
 	fileUUID := uuid.NewV4()
-	out, err := runPhantom("screen-capture.js", queryUrl, fileUUID.String(), format, screensize)
+	out, err := runPhantom("screen-capture.js", queryUrl, fileUUID.String(),
+		format, screensize)
 	if err != nil {
 		log.Println(err)
 		g.String(500, err.Error()+","+string(out))
