@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -102,9 +104,28 @@ func siteinfodyn(g *gin.Context) {
 
 }
 
+func IsValidScreenSize(input string, maxSize int) bool {
+	splitted := strings.Split(input, "x")
+	if len(splitted) != 2 {
+		return false
+	}
+
+	sizeX, err := strconv.Atoi(splitted[0])
+	if err != nil || sizeX <= 0 || sizeX > maxSize {
+		return false
+	}
+	sizeY, err := strconv.Atoi(splitted[1])
+	if err != nil || sizeY <= 0 || sizeY > maxSize {
+		return false
+	}
+	return true
+}
+
 func screenshot(g *gin.Context) {
 	queryUrl := g.Query("url")
 	format := g.Query("format")
+	screensize := g.Query("screensize")
+
 	if format == "" {
 		format = "jpg"
 	}
@@ -127,9 +148,12 @@ func screenshot(g *gin.Context) {
 		return
 	}
 
-	size := "1920x1080"
+	if !IsValidScreenSize(screensize, 4000) {
+		screensize = "1920x1080"
+	}
+
 	fileUUID := uuid.NewV4()
-	out, err := runPhantom("screen-capture.js", queryUrl, fileUUID.String(), format, size)
+	out, err := runPhantom("screen-capture.js", queryUrl, fileUUID.String(), format, screensize)
 	if err != nil {
 		log.Println(err)
 		g.String(500, err.Error()+","+string(out))
