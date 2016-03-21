@@ -127,8 +127,9 @@ func screenshot(g *gin.Context) {
 		return
 	}
 
+	size := "1920x1080"
 	fileUUID := uuid.NewV4()
-	out, err := runPhantom("screen-capture.js", queryUrl, fileUUID.String(), format)
+	out, err := runPhantom("screen-capture.js", queryUrl, fileUUID.String(), format, size)
 	if err != nil {
 		log.Println(err)
 		g.String(500, err.Error()+","+string(out))
