@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"mime"
+	"net/smtp"
 	"net/url"
 	"os"
 	"os/exec"
@@ -14,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
+	"github.com/jordan-wright/email"
 	"github.com/satori/go.uuid"
 )
 
@@ -23,19 +25,34 @@ type Settings struct {
 	S3Buckets    map[string]string
 }
 
+type TaskElement struct {
+	Id         uuid.UUID
+	Func       func(*TaskElement)
+	Message    string
+	Success    bool
+	Param1     string
+	Param2     string
+	Param3     string
+	Additional []interface{}
+	ErrorCode  int
+}
+
 var appSettings Settings = Settings{}
+var tasks chan *TaskElement = make(chan *TaskElement, 200)
 
 func main() {
-
 	appSettings.PhantomPath = "./"
 	appSettings.S3Buckets = map[string]string{
 		"Screenshots": "nightcrawlerlinks",
 	}
+	env := os.Getenv("mailgunpassword")
+	appSettings.SMTPPassword = env
+
+	go runQueue()
 
 	r := gin.Default()
-
 	r.GET("crawl/siteinfo", siteinfo)
-	r.GET("crawld/screenshot", screenshot)
+	r.GET("crawld/screenshot", queueScreenshot)
 	r.GET("crawld/siteinfo", siteinfodyn)
 	r.GET("crawld/bucketinfo", bucketinfo)
 	r.GET("crawld/pageload", siteinfodyn)
@@ -43,8 +60,20 @@ func main() {
 	r.GET("crawl/task/info", crawltask)
 	r.GET("crawl/task/stop", crawltask)
 	r.GET("crawl/task/delete", crawltask)
-	r.GET("/tasks", tasks)
+	//r.GET("/tasks", tasks)
 	r.Run(":8076")
+}
+
+func sendmail(to, subject, text, filename string) {
+	e := email.NewEmail()
+	e.From = "WebScreenshot <webscreenshot@webscreenshot.ifempty.de>"
+	e.To = []string{"marinuspfund@googlemail.com"}
+	e.Text = []byte(text)
+	e.Subject = subject
+	e.AttachFile(filename)
+	e.Send("smtp.mailgun.org:587",
+		smtp.PlainAuth("", "postmaster@webscreenshot.ifempty.de",
+			appSettings.SMTPPassword, "smtp.mailgun.org"))
 }
 
 func bucketinfo(g *gin.Context) {
@@ -121,10 +150,11 @@ func IsValidScreenSize(input string, maxSize int) bool {
 	return true
 }
 
-func screenshot(g *gin.Context) {
+func queueScreenshot(g *gin.Context) {
 	queryUrl := g.Query("url")
 	format := g.Query("format")
 	screensize := g.Query("screensize")
+	email := g.Query("email")
 
 	if format == "" {
 		format = "jpg"
@@ -152,21 +182,56 @@ func screenshot(g *gin.Context) {
 	}
 
 	fileUUID := uuid.NewV4()
-	out, err := runPhantom("screen-capture.js", queryUrl, fileUUID.String(),
+	fname := fileUUID.String() + "." + format
+
+	task := TaskElement{
+		Id:         fileUUID,
+		Func:       doScreenshot,
+		Param1:     url.String(),
+		Param2:     email,
+		Param3:     fname,
+		Additional: []interface{}{format, screensize},
+	}
+
+	tasks <- &task
+	g.JSON(200, "ok")
+}
+
+func doScreenshot(t *TaskElement) {
+	queryUrl := t.Param1
+	email := t.Param2
+	fname := t.Param3
+	format := t.Additional[0].(string)
+	screensize := t.Additional[1].(string)
+
+	_, err := runPhantom("screen-capture.js", queryUrl, fname,
 		format, screensize)
 	if err != nil {
 		log.Println(err)
-		g.String(500, err.Error()+","+string(out))
+		t.Message = err.Error()
+		t.ErrorCode = 2
 		return
 	}
 
-	fname := fileUUID.String() + "." + format
-	meta := map[string]*string{
-		"URL": &queryUrl,
+	if email != "" {
+		sendmail(email, "sreenshot "+queryUrl, "screenshot from url "+queryUrl,
+			"./"+fname)
+		t.Success = true
+	} else {
+		meta := map[string]*string{
+			"URL": &queryUrl,
+		}
+		downloadUrl, _ := uploadToS3("./"+fname, fname, meta)
+		t.Success = true
+		t.Message = downloadUrl
 	}
-	downloadUrl, _ := uploadToS3("./"+fileUUID.String(), fname, meta)
-	os.Remove(fileUUID.String())
-	g.String(200, downloadUrl)
+	os.Remove("./" + fname)
+}
+
+func runQueue() {
+	for task := range tasks {
+		task.Func(task)
+	}
 }
 
 func runPhantom(args ...string) ([]byte, error) {
@@ -175,9 +240,5 @@ func runPhantom(args ...string) ([]byte, error) {
 }
 
 func crawltask(g *gin.Context) {
-
-}
-
-func tasks(g *gin.Context) {
 
 }
