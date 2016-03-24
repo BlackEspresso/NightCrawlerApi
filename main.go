@@ -23,6 +23,7 @@ type Settings struct {
 	PhantomPath  string
 	MailSettings map[string]string
 	S3Buckets    map[string]string
+	SMTPPassword string
 }
 
 type TaskElement struct {
