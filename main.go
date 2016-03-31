@@ -68,7 +68,7 @@ func main() {
 func sendmail(to, subject, text, filename string) {
 	e := email.NewEmail()
 	e.From = "WebScreenshot <webscreenshot@webscreenshot.ifempty.de>"
-	e.To = []string{"marinuspfund@googlemail.com"}
+	e.To = []string{to}
 	e.Text = []byte(text)
 	e.Subject = subject
 	e.AttachFile(filename)
